@@ -11,6 +11,55 @@ class DataLoader:
     """Gestione caricamento e pre-elaborazione dati"""
     
     @staticmethod
+    def detect_skiprows(file_buffer, encoding='utf-8'):
+        """Rileva automaticamente le righe da saltare all'inizio del file"""
+        import re
+        
+        try:
+            file_buffer.seek(0)
+            content = file_buffer.read()
+            if isinstance(content, bytes):
+                try:
+                    text = content.decode(encoding)
+                except UnicodeDecodeError:
+                    try:
+                        text = content.decode('utf-16')
+                    except UnicodeDecodeError:
+                        text = content.decode('latin1', errors='ignore')
+            else:
+                text = content
+                
+            lines = text.splitlines()
+            
+            for i, line in enumerate(lines):
+                if not line.strip():
+                    continue
+                
+                # Prova a splittare la riga usando delimitatori comuni
+                parts = [p.strip() for p in re.split(r'[\t;,|]+|\s+', line.strip()) if p.strip()]
+                
+                num_count = 0
+                for p in parts:
+                    try:
+                        float(p.replace(',', '.'))
+                        num_count += 1
+                    except ValueError:
+                        pass
+                
+                # Se la maggior parte degli elementi sono numeri (almeno 2), è una riga dati
+                if len(parts) >= 2 and (num_count / len(parts)) >= 0.5:
+                    if i > 0:
+                        # La riga precedente è probabilmente l'intestazione
+                        return i - 1
+                    return i
+            
+            return 0
+        except Exception:
+            return 0
+        finally:
+            file_buffer.seek(0)
+            
+    @staticmethod
     def load_file(filepath, skiprows=0, encoding='utf-8'):
         """Carica file CSV, TXT, DAT, o Excel"""
         try:
