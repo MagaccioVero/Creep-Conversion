@@ -14,6 +14,9 @@ class NLREGConverter:
     """Metodo 1: NLREG - Minimizzazione dell'errore relativo con derivata seconda"""
     
     def __init__(self, t_raw, J_raw, N_elements=100):
+        if len(t_raw) == 0 or len(J_raw) == 0:
+            raise ValueError("Array di input vuoti. Verifica i dati di creep.")
+        
         self.t_raw = t_raw
         self.J_raw = J_raw
         self.N_elements = N_elements
@@ -114,6 +117,9 @@ class SchwarzlStavermanConverter:
     """Metodo 2: Schwarzl e Staverman - Approssimazione analitica"""
     
     def __init__(self, t_raw, J_raw):
+        if len(t_raw) == 0 or len(J_raw) == 0:
+            raise ValueError("Array di input vuoti. Verifica i dati di creep.")
+        
         self.t_raw = t_raw
         self.J_raw = J_raw
         self.J_inf = J_raw[-1]  # Complianza a lungo tempo
@@ -156,6 +162,9 @@ class SpectralConverter:
     """Metodo 3: Basato sugli Spettri - Analisi dello spettro di rilassamento"""
     
     def __init__(self, t_raw, J_raw, n_kernels=50):
+        if len(t_raw) == 0 or len(J_raw) == 0:
+            raise ValueError("Array di input vuoti. Verifica i dati di creep.")
+        
         self.t_raw = t_raw
         self.J_raw = J_raw
         self.n_kernels = n_kernels
