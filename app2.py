@@ -45,7 +45,7 @@ if uploaded_files:
         if file_key not in st.session_state.files_data:
             st.session_state.files_data[file_key] = {
                 'file': uploaded_file,
-                'righe_da_saltare': DataLoader.detect_skiprows(uploaded_file),
+                'righe_da_saltare': 0,
                 'df': None,
                 'dati_pronti': False,
                 'col_tempo': None,
@@ -102,18 +102,11 @@ if st.session_state.file_list:
                     uploaded_file = file_data['file']
                     uploaded_file.seek(0)
                     
-                    if uploaded_file.name.endswith(('.csv', '.txt', '.dat')):
-                        try:
-                            df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8', skiprows=file_data['righe_da_saltare'])
-                        except UnicodeDecodeError:
-                            uploaded_file.seek(0)
-                            try:
-                                df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-16', skiprows=file_data['righe_da_saltare'])
-                            except UnicodeDecodeError:
-                                uploaded_file.seek(0)
-                                df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin1', skiprows=file_data['righe_da_saltare'])
-                    else:
-                        df = pd.read_excel(uploaded_file, skiprows=file_data['righe_da_saltare'])
+                    try:
+                        df = DataLoader.read_data_smart(uploaded_file, uploaded_file.name, user_skiprows=file_data['righe_da_saltare'])
+                    except Exception as e:
+                        st.error(f"Errore nel caricamento del file: {e}")
+                        st.stop()
                     
                     file_data['df'] = df
                 else:
@@ -267,22 +260,10 @@ if st.session_state.file_list:
                         )
                         
                         if uploaded_file_agg is not None:
-                            default_skip_agg = DataLoader.detect_skiprows(uploaded_file_agg)
-                            righe_agg = st.number_input("Righe da saltare:", min_value=0, value=int(default_skip_agg), step=1, key=f"righe_agg_{file_key}")
+                            righe_agg = st.number_input("Righe da saltare:", min_value=0, value=0, step=1, key=f"righe_agg_{file_key}")
                             
                             try:
-                                if uploaded_file_agg.name.endswith(('.csv', '.txt', '.dat')):
-                                    try:
-                                        df_agg_raw = pd.read_csv(uploaded_file_agg, sep=None, engine='python', encoding='utf-8', skiprows=righe_agg)
-                                    except UnicodeDecodeError:
-                                        uploaded_file_agg.seek(0)
-                                        try:
-                                            df_agg_raw = pd.read_csv(uploaded_file_agg, sep=None, engine='python', encoding='utf-16', skiprows=righe_agg)
-                                        except UnicodeDecodeError:
-                                            uploaded_file_agg.seek(0)
-                                            df_agg_raw = pd.read_csv(uploaded_file_agg, sep=None, engine='python', encoding='latin1', skiprows=righe_agg)
-                                else:
-                                    df_agg_raw = pd.read_excel(uploaded_file_agg, skiprows=righe_agg)
+                                df_agg_raw = DataLoader.read_data_smart(uploaded_file_agg, uploaded_file_agg.name, user_skiprows=righe_agg)
                                 
                                 colonne_agg = df_agg_raw.columns.tolist()
                                 

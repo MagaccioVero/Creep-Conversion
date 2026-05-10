@@ -11,53 +11,79 @@ class DataLoader:
     """Gestione caricamento e pre-elaborazione dati"""
     
     @staticmethod
-    def detect_skiprows(file_buffer, encoding='utf-8'):
-        """Rileva automaticamente le righe da saltare all'inizio del file"""
-        import re
-        
+    def _is_float(s):
         try:
+            float(s.replace(',', '.'))
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def read_data_smart(file_buffer, filename, user_skiprows=0):
+        """Legge intelligentemente i dati trovando l'inizio della tabella"""
+        import re
+        import io
+        
+        if filename.endswith(('.xlsx', '.xls')):
             file_buffer.seek(0)
-            content = file_buffer.read()
-            if isinstance(content, bytes):
-                try:
-                    text = content.decode(encoding)
-                except UnicodeDecodeError:
-                    try:
-                        text = content.decode('utf-16')
-                    except UnicodeDecodeError:
-                        text = content.decode('latin1', errors='ignore')
-            else:
-                text = content
-                
-            lines = text.splitlines()
+            return pd.read_excel(file_buffer, skiprows=user_skiprows)
             
-            for i, line in enumerate(lines):
-                if not line.strip():
-                    continue
+        encodings = ['utf-8', 'utf-16', 'latin1']
+        text = None
+        for enc in encodings:
+            try:
+                file_buffer.seek(0)
+                content = file_buffer.read()
+                if isinstance(content, bytes):
+                    text = content.decode(enc)
+                else:
+                    text = content
+                break
+            except UnicodeDecodeError:
+                continue
                 
-                # Prova a splittare la riga usando delimitatori comuni
-                parts = [p.strip() for p in re.split(r'[\t;,|]+|\s+', line.strip()) if p.strip()]
-                
-                num_count = 0
-                for p in parts:
-                    try:
-                        float(p.replace(',', '.'))
-                        num_count += 1
-                    except ValueError:
-                        pass
-                
-                # Se la maggior parte degli elementi sono numeri (almeno 2), è una riga dati
-                if len(parts) >= 2 and (num_count / len(parts)) >= 0.5:
-                    if i > 0:
-                        # La riga precedente è probabilmente l'intestazione
-                        return i - 1
-                    return i
+        if text is None:
+            raise ValueError("Impossibile decodificare il file")
             
-            return 0
-        except Exception:
-            return 0
-        finally:
+        lines = text.splitlines()
+        data_start_idx = -1
+        num_cols = 0
+        
+        for i, line in enumerate(lines):
+            if not line.strip():
+                continue
+            
+            parts = [p.strip() for p in re.split(r'[\t;,|]+|\s\s+', line.strip()) if p.strip()]
+            num_count = sum(1 for p in parts if DataLoader._is_float(p))
+            
+            if len(parts) >= 2 and (num_count / len(parts)) >= 0.5:
+                data_start_idx = i
+                num_cols = len(parts)
+                break
+                
+        if data_start_idx == -1:
             file_buffer.seek(0)
+            return pd.read_csv(file_buffer, sep=None, engine='python', skiprows=user_skiprows)
+            
+        header_idx = -1
+        for i in range(data_start_idx - 1, -1, -1):
+            line = lines[i]
+            if not line.strip():
+                continue
+            parts = [p.strip() for p in re.split(r'[\t;,|]+|\s\s+', line.strip()) if p.strip()]
+            if len(parts) >= num_cols - 1:
+                header_idx = i
+                break
+                
+        skip_indices = []
+        for i in range(data_start_idx):
+            if i != header_idx:
+                skip_indices.append(i)
+                
+        for i in range(user_skiprows):
+            skip_indices.append(data_start_idx + i)
+            
+        return pd.read_csv(io.StringIO(text), sep=None, engine='python', skiprows=skip_indices)
             
     @staticmethod
     def load_file(filepath, skiprows=0, encoding='utf-8'):
