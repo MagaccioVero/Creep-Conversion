@@ -45,7 +45,7 @@ if uploaded_files:
         if file_key not in st.session_state.files_data:
             st.session_state.files_data[file_key] = {
                 'file': uploaded_file,
-                'righe_da_saltare': 0,
+                'righe_da_saltare': DataLoader.detect_skiprows(uploaded_file),
                 'df': None,
                 'dati_pronti': False,
                 'col_tempo': None,
@@ -159,6 +159,11 @@ if st.session_state.file_list:
                         else:
                             df_creep, sigma_0_val = DataLoader.prepare_creep_data(df.copy(), col_tempo, col_complianza)
                         
+                        # Verifica se i dati sono vuoti
+                        if df_creep.empty or len(df_creep) == 0:
+                            st.error("❌ Nessun dato valido trovato dopo la pre-elaborazione. Verifica i dati di input (possibili cause: valori NaN, tempi ≤ 0, colonne errate).")
+                            continue
+                        
                         file_data['df_creep'] = df_creep
                         file_data['sigma_0'] = sigma_0_val
                         file_data['dati_pronti'] = True
@@ -221,6 +226,11 @@ if st.session_state.file_list:
                     st.write(f"**λ applicato:** {lambda_reg:.2e}")
                     
                     if st.button(f"🔄 Riconverti con nuovo λ - {file_key}", key=f"btn_reconvert_{file_key}"):
+                        # Verifica se i dati sono vuoti
+                        if df_creep.empty or len(df_creep) == 0:
+                            st.error("❌ Nessun dato valido trovato. Rielabora i dati prima.")
+                            st.stop()
+                        
                         with st.spinner("Riconversione con nuovo λ..."):
                             results = {}
                             
@@ -257,7 +267,8 @@ if st.session_state.file_list:
                         )
                         
                         if uploaded_file_agg is not None:
-                            righe_agg = st.number_input("Righe da saltare:", min_value=0, value=0, step=1, key=f"righe_agg_{file_key}")
+                            default_skip_agg = DataLoader.detect_skiprows(uploaded_file_agg)
+                            righe_agg = st.number_input("Righe da saltare:", min_value=0, value=int(default_skip_agg), step=1, key=f"righe_agg_{file_key}")
                             
                             try:
                                 if uploaded_file_agg.name.endswith(('.csv', '.txt', '.dat')):
